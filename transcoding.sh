@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/local/bin/bash
 
 input_file=$1
 
@@ -39,8 +39,8 @@ ffprobe=$(which ffprobe)
 VCODEC="libx264"
 ABRATE="128k"
 ASAMPLING="48k"
-LOGFILE=/tmp/ffmpeg
-TMPFILE=/tmp/ffmpeg-pass-1
+LOGFILE=$(mktemp /tmp/ffmpeg.XXXXXXXXX)
+TMPFILE=$(mktemp /tmp/ffmpeg-pass-1.XXXXXXXXX)
 LOUDNORM="-af loudnorm=I=-16:TP=-1:LRA=13"
 LOUDNORM_PARAMS=":print_format=json"
 
@@ -118,6 +118,6 @@ if [[ ${DEBUG} -eq 1 ]]; then echo 'DEBUG. TWO PASS CODING START'; fi
       echo "DEBUG. PASS-2 done - ${runtime}sec (${p2time}sec)";
      fi
 
-    rm ${LOGFILE}*
+    rm ${LOGFILE} ${TMPFILE}
 
     echo 'Done'

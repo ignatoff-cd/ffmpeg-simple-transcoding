@@ -3,11 +3,11 @@
 ```shell
 usage: ./transcode.sh FILENAME_PATH  --bitrate=BITRATE_INT --scale=HEIGHT_INT:WIDTH_INT --output=RESULT_FILENAME_PATH --debug
 ```
-###System
+### System
 * ffmpeg, ffprobe, which must be installed
 * bash version >= 4.4 
 
-###Options
+### Options
 * _FILENAME_PATH_ - abs or relative path to the input video file. **Must be a first argument**
 * _BITRATE_INT_ - unsigned integer (in kb/s)
 * _HEIGHT_INT & WIDTH_INT_ - unsigned integer

@@ -4,7 +4,7 @@
 usage: ./transcode.sh FILENAME_PATH  --bitrate=BITRATE_INT --scale=HEIGHT_INT:WIDTH_INT --output=RESULT_FILENAME_PATH --debug
 ```
 ### System
-* ffmpeg, ffprobe, which must be installed
+* `ffmpeg`, `ffprobe`, `which` must be installed
 * bash version >= 4.4 
 
 ### Options

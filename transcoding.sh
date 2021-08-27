@@ -79,7 +79,7 @@ LOUDNORM_OFF=0
 		SCALE="scale=${VSCALE}"
 		BITRATE="${VBRATE}k"
 		start=$(date +%s)
-		COMMAND="-c:v ${VCODEC} -passlogfile ${LOGFILE} -vf ${SCALE} -b:v ${BITRATE} -bufsize 4M -b:a ${ABRATE} -movflags +faststart -ar ${ASAMPLING}"
+		COMMAND="-hide_banner -c:v ${VCODEC} -passlogfile ${LOGFILE} -vf ${SCALE} -b:v ${BITRATE} -bufsize 4M -b:a ${ABRATE} -movflags +faststart -ar ${ASAMPLING}"
 
     if [[ ${DEBUG} -eq 1 ]]; then
       echo "DEBUG. output fileinfo: scale=${VSCALE}, bitrate=${VBRATE}kb/s"
@@ -89,6 +89,12 @@ LOUDNORM_OFF=0
     if [[ ${DEBUG} -eq 1 ]]; then echo 'DEBUG. TWO PASS CODING START'; fi
     # pass 1
 		$ffmpeg -y -i ${input_file} ${COMMAND} ${LOUDNORM}${LOUDNORM_PARAMS} -vsync cfr -pass 1 -f null /dev/null 2> ${TMPFILE}
+
+    err=$(cat ${TMPFILE} | grep -i error  -B 2)
+    if [[ $err ]];then
+      echo "$err"
+      exit
+    fi
 
 		pass1=$(date +%s)
 		runtime=$((pass1 -start))

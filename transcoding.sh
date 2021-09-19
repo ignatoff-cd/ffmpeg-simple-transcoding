@@ -42,6 +42,8 @@ ASAMPLING="48k"
 LOGFILE=$(mktemp /tmp/ffmpeg.XXXXXXXXX)
 TMPFILE=$(mktemp /tmp/ffmpeg-pass-1.XXXXXXXXX)
 TMP_SILENCE_FILE=$(mktemp /tmp/ffmpeg-silence.XXXXXXXXX)
+TMP_CHECK_AUDIO=$(mktemp /tmp/ffmpeg-check-audio.XXXXXXXXX)
+TMP_PROBE_ERROR=$(mktemp /tmp/ffmpeg-probe-error.XXXXXXXXX)
 LOUDNORM="-af loudnorm=I=-16:TP=-1:LRA=13"
 LOUDNORM_PARAMS=":print_format=json"
 LOUDNORM_OFF=0
@@ -58,6 +60,14 @@ LOUDNORM_OFF=0
     duration=$(echo $finfo | cut -f3 -d ',' | cut -f2 -d'=')
     size=$(du -h ${input_file} |cut -f1)
 
+    $ffprobe ${input_file} -loglevel 24  2> ${TMP_PROBE_ERROR}
+    probe_errors=$(wc -l "${TMP_PROBE_ERROR}" | awk '{print $1}')
+
+    if [[ ${probe_errors} -gt 0 ]]; then
+      echo -en "ERROR: " && cat "${TMP_PROBE_ERROR}"
+      exit
+    fi
+
     if [[ ${DEBUG} -eq 1 ]]; then
       yes "*"  |head -n 80|tr -d '\n'
       echo
@@ -66,14 +76,27 @@ LOUDNORM_OFF=0
       echo
     fi
 
-    # detect silence
-    $ffmpeg -i ${input_file} -af silencedetect=noise=0.0001  -f null /dev/null 2> "${TMP_SILENCE_FILE}"
-    silence_duration=$(cat ${TMP_SILENCE_FILE} | grep silence_duration | cut -f2 -d'|' |  cut -f2 -d':' |tr -d ' ')
-    int_duration=$(echo "$duration" | awk '{printf "%.0f", $1}')
-    if [[ ${DEBUG} -eq 1 ]]; then echo "DEBUG. duration:$int_duration <> silence: ${silence_duration:-0}"; fi
-    if ((int_duration - silence_duration < 2));then
+    #check audio stream is exists OR soundless audio stream
+    $ffprobe -i ${input_file} -show_streams -select_streams a -loglevel error > "${TMP_CHECK_AUDIO}"
+    a_lines=$(wc -l "${TMP_CHECK_AUDIO}" | awk '{print $1}')
+    if [[ $a_lines -eq 0 ]];then
       LOUDNORM_OFF=1
+      LOUDNORM=
+      LOUDNORM_PARAMS=
       if [[ ${DEBUG} -eq 1 ]]; then echo "DEBUG. LOUDNORM OFF"; fi
+    else
+      # detect silence
+      $ffmpeg -i ${input_file} -af silencedetect=noise=0.0001  -f null /dev/null 2> "${TMP_SILENCE_FILE}"
+      silence_duration=$(cat ${TMP_SILENCE_FILE} | grep silence_duration | cut -f2 -d'|' |  cut -f2 -d':' |tr -d ' ')
+      int_duration=$(echo "$duration" | awk '{printf "%.0f", $1}')
+      if [[ ${DEBUG} -eq 1 ]]; then echo "DEBUG. duration:$int_duration <> silence: ${silence_duration:-0}"; fi
+      if ((int_duration - silence_duration < 2));then
+        LOUDNORM_OFF=1
+        LOUDNORM=
+        LOUDNORM_PARAMS=
+
+        if [[ ${DEBUG} -eq 1 ]]; then echo "DEBUG. LOUDNORM OFF"; fi
+      fi
     fi
 
 		SCALE="scale=${VSCALE}"
@@ -92,7 +115,7 @@ LOUDNORM_OFF=0
 
     err=$(cat ${TMPFILE} | grep -i error  -B 2)
     if [[ $err ]];then
-      echo "$err"
+      echo "ERROR. $err"
       exit
     fi
 
@@ -137,6 +160,6 @@ LOUDNORM_OFF=0
       echo "DEBUG. PASS-2 done - ${runtime}sec (${p2time}sec)";
      fi
 
-    rm ${LOGFILE} ${TMPFILE} ${TMP_SILENCE_FILE}
+    rm ${LOGFILE} ${TMPFILE} ${TMP_SILENCE_FILE} ${TMP_PROBE_ERROR} ${TMP_CHECK_AUDIO}
 
     echo 'Done'

@@ -60,21 +60,21 @@ if [[ ! ${RESULT_FILENAME_PATH} ]]; then
   exit
 fi
 
-# shellcheck disable=SC2006
+# get probe error and exit if exists
+$ffprobe ${input_file} -loglevel 24 2>${TMP_PROBE_ERROR}
+probe_errors=$(wc -l "${TMP_PROBE_ERROR}" | awk '{print $1}')
+if [[ ${probe_errors} -gt 0 ]]; then
+  echo -en "ERROR: " && cat "${TMP_PROBE_ERROR}"
+  exit
+fi
+
+# get file info
 finfo=$($ffprobe -v error -select_streams v:0 -show_entries format=bit_rate,duration -show_entries stream=width,height -of default=noprint_wrappers=1 ${input_file} | tr -s '\n' ',')
 width=$(echo $finfo | cut -f1 -d ',' | cut -f2 -d'=')
 height=$(echo $finfo | cut -f2 -d ',' | cut -f2 -d'=')
 bitrate=$(echo $finfo | cut -f4 -d ',' | cut -f2 -d'=')
 duration=$(echo $finfo | cut -f3 -d ',' | cut -f2 -d'=')
 size=$(du -h ${input_file} | cut -f1)
-
-$ffprobe ${input_file} -loglevel 24 2>${TMP_PROBE_ERROR}
-probe_errors=$(wc -l "${TMP_PROBE_ERROR}" | awk '{print $1}')
-
-if [[ ${probe_errors} -gt 0 ]]; then
-  echo -en "ERROR: " && cat "${TMP_PROBE_ERROR}"
-  exit
-fi
 
 if [[ ${DEBUG} -eq 1 ]]; then
   yes "*" | head -n 80 | tr -d '\n'
@@ -84,7 +84,7 @@ if [[ ${DEBUG} -eq 1 ]]; then
   echo
 fi
 
-#check audio stream is exists OR soundless audio stream
+# check audio stream is exists OR soundless audio stream
 $ffprobe -i ${input_file} -show_streams -select_streams a -loglevel error >"${TMP_CHECK_AUDIO}"
 a_lines=$(wc -l "${TMP_CHECK_AUDIO}" | awk '{print $1}')
 if [[ $a_lines -eq 0 ]]; then
@@ -93,7 +93,7 @@ if [[ $a_lines -eq 0 ]]; then
   LOUDNORM_PARAMS=
   if [[ ${DEBUG} -eq 1 ]]; then echo "DEBUG. LOUDNORM OFF"; fi
 else
-  # detect silence
+# detect silence
   $ffmpeg -i ${input_file} -af silencedetect=noise=0.0001 -f null /dev/null 2>"${TMP_SILENCE_FILE}"
   silence_duration=$(cat ${TMP_SILENCE_FILE} | grep silence_duration | cut -f2 -d'|' | cut -f2 -d':' | tr -d ' ')
   int_duration=$(echo "$duration" | awk '{printf "%.0f", $1}')
@@ -109,6 +109,7 @@ else
   fi
 fi
 
+# generate command
 SCALE="scale=${VSCALE}"
 BITRATE="${VBRATE}k"
 start=$(date +%s)
@@ -120,9 +121,10 @@ if [[ ${DEBUG} -eq 1 ]]; then
 fi
 
 if [[ ${DEBUG} -eq 1 ]]; then echo 'DEBUG. TWO PASS CODING START'; fi
-# pass 1
+# start pass 1
 $ffmpeg -y -i ${input_file} ${COMMAND} ${LOUDNORM}${LOUDNORM_PARAMS} -vsync cfr -pass 1 -f null /dev/null 2>${TMPFILE}
 
+# exit if error
 err=$(cat ${TMPFILE} | grep -i error -B 2)
 if [[ $err ]]; then
   echo "ERROR. $err"
@@ -132,8 +134,9 @@ fi
 pass1=$(date +%s)
 runtime=$((pass1 - start))
 if [[ ${DEBUG} -eq 1 ]]; then echo "DEBUG. PASS-1 done - ${runtime}sec"; fi
+
+# get loudnorn params
 if [[ ${LOUDNORM_OFF} -eq 0 ]]; then
-  # shellcheck disable=SC2006
   LOUDNORM_PARAMS=$(cat ${TMPFILE} | sed -n '/Parsed_loudnorm/,/}/p' | tail -n+3 | head -n+10 | tr -d '",' | while IFS='' read -r line || [[ -n "$line" ]]; do
     val=$(echo "${line}" | tr -d '[:space:]' | cut -f2 -d':')
     case $(echo "${line}" | tr -d '[:space:]' | cut -f1 -d':') in
@@ -156,10 +159,9 @@ if [[ ${LOUDNORM_OFF} -eq 0 ]]; then
     echo "${l_param}"
   done | tail -1)
 fi
-# debug message
 if [[ ${DEBUG} -eq 1 ]]; then echo "DEBUG. LOUDNORM_PARAMS = ${LOUDNORM_PARAMS}"; fi
 
-# pass 2
+# start pass 2
 $ffmpeg -v error -y -i ${input_file} ${COMMAND} ${LOUDNORM}${LOUDNORM_PARAMS} -pass 2 ${RESULT_FILENAME_PATH}
 
 pass2=$(date +%s)

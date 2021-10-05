@@ -38,11 +38,12 @@ ffprobe=$(which ffprobe)
 VCODEC="libx264"
 ABRATE="128k"
 ASAMPLING="48k"
-LOGFILE=$(mktemp /tmp/ffmpeg.XXXXXXXXX)
-TMPFILE=$(mktemp /tmp/ffmpeg-pass-1.XXXXXXXXX)
-TMP_SILENCE_FILE=$(mktemp /tmp/ffmpeg-silence.XXXXXXXXX)
-TMP_CHECK_AUDIO=$(mktemp /tmp/ffmpeg-check-audio.XXXXXXXXX)
-TMP_PROBE_ERROR=$(mktemp /tmp/ffmpeg-probe-error.XXXXXXXXX)
+TEMP_DIR=$(mktemp -d /tmp/ffmpeg.XXXXXXXXX)
+LOGFILE="${TEMP_DIR}/pass-log-file"
+TMPFILE="${TEMP_DIR}/ffmpeg-pass-1"
+TMP_SILENCE_FILE="${TEMP_DIR}/ffmpeg-silence"
+TMP_CHECK_AUDIO="${TEMP_DIR}/ffmpeg-check-audio"
+TMP_PROBE_ERROR="${TEMP_DIR}/ffmpeg-probe-error"
 LOUDNORM="-af loudnorm=I=-16:TP=-1:LRA=13"
 LOUDNORM_PARAMS=":print_format=json"
 LOUDNORM_OFF=0
@@ -172,6 +173,6 @@ if [[ ${DEBUG} -eq 1 ]]; then
   echo "DEBUG. PASS-2 done - ${runtime}sec (${p2time}sec)"
 fi
 
-rm ${LOGFILE} ${TMPFILE} ${TMP_SILENCE_FILE} ${TMP_PROBE_ERROR} ${TMP_CHECK_AUDIO}
+rm -rf "${TEMP_DIR}"
 
 echo 'Done'
